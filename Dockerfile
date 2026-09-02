@@ -1,5 +1,14 @@
 # Hermes Agent — Render Dockerfile
 # Образ для Free Tier Render. Поднимает полный стек: CLI, gateway, dashboard.
+#
+# Hermes запрещает обычный `pip install` (см. hermes-src/setup.py). Разрешены
+# только editable-install, shell installer, Docker-образ или Nix. Используем
+# editable, но СТАВИМ ПОД ROOT, чтобы:
+#   • бинарь `hermes` ушёл в /usr/local/bin (а не ~/.local/bin),
+#   • пакет `hermes_cli` лёг в /usr/local/lib/python3.11/site-packages,
+#   • шебанг бинаря указывал на /usr/local/bin/python — стабильный путь.
+# Потом переключаемся на непривилегированного hermes — у него нет своего
+# site-packages, поэтому import идёт в системный, всё находится.
 FROM mcr.microsoft.com/devcontainers/python:3.11-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -10,35 +19,43 @@ ENV DEBIAN_FRONTEND=noninteractive \
     HERMES_HOME=/home/hermes/.hermes \
     HERMES_NO_UPDATE_CHECK=1
 
-# Системные зависимости: tmux нужен для TUI, git — для установки Hermes,
-# curl/ca-certificates — для инсталлятора и OpenAI-совместимого прокси.
+# Системные зависимости. git нужен для клонирования; tini корректно гасит
+# SIGTERM от Render; tmux для TUI на продвинутых сценариях.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git curl ca-certificates tmux tini openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Непривилегированный пользователь — Render запускает контейнеры под non-root,
-# а Hermes setup лучше делать не от root.
-RUN useradd -m -s /bin/bash hermes
+# Клонируем исходники (нужны для editable-install — pip тянет метаданные
+# из pyproject.toml + setup.py).
+RUN git clone --depth 1 --recurse-submodules \
+        https://github.com/NousResearch/hermes-agent.git /opt/hermes-src
+
+# Editable install под ROOT — гарантирует системные пути, которые не зависят
+# от пользователя.
+RUN pip install --no-cache-dir -e /opt/hermes-src \
+ && rm -rf /opt/hermes-src
+
+# Sanity-check: после установки бинарь должен лежать в /usr/local/bin и
+# `hermes --help` должен работать ещё до переключения пользователя.
+RUN which hermes && hermes --help >/dev/null && echo "[dockerfile] hermes CLI ok"
+
+# Непривилегированный пользователь — Render запускает контейнеры под non-root.
+RUN useradd -m -s /bin/bash hermes \
+ && mkdir -p /home/hermes/.hermes \
+ && chown -R hermes:hermes /home/hermes
 
 USER hermes
 WORKDIR /home/hermes
 
-# Сначала ставим сам Hermes CLI, чтобы слой кэшировался.
-# Клонируем в /tmp/hermes-src, затем ставим через pip editable —
-# так не упираемся в непустой WORKDIR от COPY ниже.
-RUN git clone --depth 1 https://github.com/NousResearch/hermes-agent.git /tmp/hermes-src \
- && pip install --no-build-isolation -e /tmp/hermes-src \
- && rm -rf /tmp/hermes-src/.git
-
-# Конфиги приложения подкладываем ПОСЛЕ установки пакета.
-COPY --chown=hermes:hermes start.sh /home/hermes/start.sh
-COPY --chown=hermes:hermes .env.example /home/hermes/.env.example
-COPY --chown=hermes:hermes README.md /home/hermes/README.md
+# Документация и конфиги приложения.
+COPY --chown=hermes:hermes start.sh       /home/hermes/start.sh
+COPY --chown=hermes:hermes .env.example   /home/hermes/.env.example
+COPY --chown=hermes:hermes README.md      /home/hermes/README.md
 
 RUN chmod +x /home/hermes/start.sh
 
-# Render прокидывает порт в $PORT. По умолчанию — 8000 для dashboard/proxy.
-EXPOSE 8000
+# Render прокидывает порт в $PORT. По умолчанию — 10000 для web service.
+EXPOSE 10000
 
 # tini корректно обрабатывает SIGTERM от Render при редеплое/усыплении.
 ENTRYPOINT ["/usr/bin/tini", "--"]

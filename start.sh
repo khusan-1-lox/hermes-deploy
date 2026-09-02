@@ -5,15 +5,9 @@ set -euo pipefail
 
 cd /home/hermes
 
-# pip кладёт бинарь в ~/.local/bin, который не на PATH по умолчанию —
-# поэтому либо зовём через python -m, либо дополняем PATH.
-export PATH="/home/hermes/.local/bin:${PATH}"
-
-# Если установили editable через pip, доступен модуль hermes_cli.main.
-HERMES_BIN="$(command -v hermes || true)"
-if [ -z "${HERMES_BIN:-}" ]; then
-  HERMES_BIN="python -m hermes_cli.main"
-fi
+# `hermes` ставится editable в /usr/local/bin под root на этапе сборки —
+# он доступен всем пользователям, включая hermes, под которым мы сейчас.
+HERMES_BIN="$(command -v hermes || echo 'python -m hermes_cli.main')"
 echo "[start] using hermes binary: ${HERMES_BIN}"
 
 # Hermes setup идемпотентен: если конфиг уже есть, повторный setup пропускает шаги.
