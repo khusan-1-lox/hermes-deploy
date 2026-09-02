@@ -52,9 +52,10 @@ USER hermes
 WORKDIR /home/hermes
 
 # Документация и конфиги приложения.
-COPY --chown=hermes:hermes start.sh       /home/hermes/start.sh
-COPY --chown=hermes:hermes .env.example   /home/hermes/.env.example
-COPY --chown=hermes:hermes README.md      /home/hermes/README.md
+COPY --chown=hermes:hermes start.sh          /home/hermes/start.sh
+COPY --chown=hermes:hermes hermes_proxy.py   /home/hermes/hermes_proxy.py
+COPY --chown=hermes:hermes .env.example      /home/hermes/.env.example
+COPY --chown=hermes:hermes README.md         /home/hermes/README.md
 
 RUN chmod +x /home/hermes/start.sh
 

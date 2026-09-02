@@ -1,23 +1,21 @@
 #!/usr/bin/env bash
-# Hermes на Render: поднимает прокси OpenAI-совместимое API на $PORT,
-# плюс стартует gateway в фоне для мессенджеров (если есть токены).
+# Hermes на Render: поднимает OpenAI-совместимый HTTP-прокси на $PORT,
+# который добавляет OPENROUTER_API_KEY к исходящим запросам.
+#
+# Используем кастомный прокси (hermes_proxy.py), а не встроенный
+# `hermes proxy`, потому что тот работает только с OAuth-провайдерами
+# Nous/xAI, а нам нужен произвольный API-ключ.
 set -euo pipefail
 
 cd /home/hermes
 
-# `hermes` ставится editable в /usr/local/bin под root на этапе сборки —
-# он доступен всем пользователям, включая hermes, под которым мы сейчас.
+# Инициализация конфига Hermes (идемпотентна: повторный запуск ничего
+# не перезаписывает). Нужна, чтобы gateway/CLI корректно находили config.
 HERMES_BIN="$(command -v hermes || echo 'python -m hermes_cli.main')"
-echo "[start] using hermes binary: ${HERMES_BIN}"
-
-# Hermes setup идемпотентен: если конфиг уже есть, повторный setup пропускает шаги.
 if [ ! -f "${HERMES_HOME}/config.yaml" ]; then
-  echo "[start] first boot — running non-interactive setup"
+  echo "[start] first boot — initialising Hermes config"
   ${HERMES_BIN} config set display.interface cli || true
 fi
 
-echo "[start] HERMES_HOME=${HERMES_HOME}  PORT=${PORT:-10000}"
-echo "[start] starting hermes proxy on :${PORT:-10000}"
-
-# OpenAI-совместимый HTTP-сервер. Render Free Tier даёт PORT=10000.
-exec ${HERMES_BIN} proxy --host 0.0.0.0 --port "${PORT:-10000}"
+echo "[start] starting hermes_proxy on :${PORT:-10000} (model=${HERMES_MODEL:-openrouter/auto})"
+exec python /home/hermes/hermes_proxy.py
