@@ -32,8 +32,12 @@ RUN git clone --depth 1 --recurse-submodules \
 
 # Editable install под ROOT — гарантирует системные пути, которые не зависят
 # от пользователя.
-RUN pip install --no-cache-dir -e /opt/hermes-src \
- && rm -rf /opt/hermes-src
+#
+# ВАЖНО: /opt/hermes-src НЕЛЬЗЯ удалять после установки.
+# setuptools editable-install для проектов с [tool.setuptools.packages.find]
+# создаёт .pth-файл в site-packages, который на каждом импорте добавляет
+# /opt/hermes-src в sys.path. Удалишь — ModuleNotFoundError.
+RUN pip install --no-cache-dir -e /opt/hermes-src
 
 # Sanity-check: после установки бинарь должен лежать в /usr/local/bin и
 # `hermes --help` должен работать ещё до переключения пользователя.
