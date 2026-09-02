@@ -24,11 +24,13 @@ USER hermes
 WORKDIR /home/hermes
 
 # Сначала ставим сам Hermes CLI, чтобы слой кэшировался.
-RUN git clone --depth 1 https://github.com/NousResearch/hermes-agent.git . \
- && pip install -e . \
- && rm -rf .git
+# Клонируем в /tmp/hermes-src, затем ставим через pip editable —
+# так не упираемся в непустой WORKDIR от COPY ниже.
+RUN git clone --depth 1 https://github.com/NousResearch/hermes-agent.git /tmp/hermes-src \
+ && pip install --no-build-isolation -e /tmp/hermes-src \
+ && rm -rf /tmp/hermes-src/.git
 
-# Конфиги приложения
+# Конфиги приложения подкладываем ПОСЛЕ установки пакета.
 COPY --chown=hermes:hermes start.sh /home/hermes/start.sh
 COPY --chown=hermes:hermes .env.example /home/hermes/.env.example
 COPY --chown=hermes:hermes README.md /home/hermes/README.md
