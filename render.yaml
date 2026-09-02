@@ -1,0 +1,33 @@
+# Render Blueprint — деплой Hermes в один клик.
+# https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: hermes-agent
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: main
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /v1/models
+    autoDeploy: true
+    envVars:
+      - key: HERMES_HOME
+        value: /home/hermes/.hermes
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: DISCORD_BOT_TOKEN
+        sync: false
+      - key: SLACK_BOT_TOKEN
+        sync: false
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: HERMES_MODEL
+        value: openrouter/deepseek/deepseek-chat-v3.1:free
+      - key: PYTHONUNBUFFERED
+        value: "1"
